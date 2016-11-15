@@ -12,6 +12,7 @@ namespace NuGetDependencyDownloader
     public partial class MainForm : Form
     {
         BackgroundWorker _worker;
+        PackageTool _packageTool;
 
         public MainForm()
         {
@@ -36,6 +37,7 @@ namespace NuGetDependencyDownloader
 
         private void btnStop_Click(object sender, EventArgs e)
         {
+            ShowActivity("Stop requested.");
             btnStop.Enabled = false;
             _worker.CancelAsync();
         }
@@ -50,6 +52,11 @@ namespace NuGetDependencyDownloader
             _worker.DoWork += new DoWorkEventHandler(DoWork);
             _worker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(EndWork);
             _worker.ProgressChanged += new ProgressChangedEventHandler(Progress);
+
+            _packageTool = new PackageTool();
+            _packageTool.StopRequested = () => _worker.CancellationPending;
+            _packageTool.Progress = (x) => _worker.ReportProgress(0, x);
+
             _worker.RunWorkerAsync();
         }
 
@@ -62,109 +69,14 @@ namespace NuGetDependencyDownloader
         {
             btnStop.Enabled = false;
             btnStart.Enabled = true;
+
+            _packageTool = null;
+            _worker = null;
         }
 
         void DoWork(object sender, DoWorkEventArgs e)
         {
-            CollectPackages();
-
-            if (_worker.CancellationPending)
-            {
-                _worker.ReportProgress(0, "Stopped.");
-                return;
-            }
-
-            _worker.ReportProgress(0, string.Format("{0} packages to download.", Utility.Packages.Count));
-
-            DownloadPackages();
-
-            if (_worker.CancellationPending)
-            {
-                _worker.ReportProgress(0, "Stopped.");
-                return;
-            }
-
-            _worker.ReportProgress(0, "Done.");
-        }
-
-        private void CollectPackages()
-        {
-            Utility.Packages.Clear();
-
-            IPackage package;
-            if (string.IsNullOrWhiteSpace(textBoxVersion.Text))
-            {
-                package = Utility.GetLatestPackage(textBoxPackage.Text, checkBoxPrerelease.Checked);
-            }
-            else
-            {
-                var version = SemanticVersion.Parse(textBoxVersion.Text);
-                package = Utility.GetPackages(textBoxPackage.Text, checkBoxPrerelease.Checked)
-                    .Where(o => o.Version == version)
-                    .FirstOrDefault();
-            }
-
-            if (package == null)
-            {
-                _worker.ReportProgress(0, "Package not found.");
-                return;
-            }
-
-            Utility.Packages.Add(package);
-            _worker.ReportProgress(0, package.GetFullName());
-            LoadDependencies(package);
-        }
-
-        private void LoadDependencies(IPackage package)
-        {
-            if (package.DependencySets != null)
-            {
-                var dependencies = package.DependencySets
-                    .SelectMany(o => o.Dependencies.Select(x => new Dependency { Id = x.Id, VersionSpec = x.VersionSpec }))
-                    .ToList();
-
-                foreach (var dependency in dependencies)
-                {
-                    if (_worker.CancellationPending)
-                        return;
-
-                    IQueryable<IPackage> packages = Utility.GetPackages(dependency.Id, checkBoxPrerelease.Checked);
-                    IPackage depPackage = Utility.GetRangedPackageVersion(packages, dependency.VersionSpec);
-                    _worker.ReportProgress(0, string.Format("{0} -> {1}", package.GetFullName(), depPackage.GetFullName()));
-
-                    if (!Utility.IsPackageKnown(depPackage))
-                    {
-                        Utility.Packages.Add(depPackage);
-                        LoadDependencies(depPackage);
-                    }
-                }
-            }
-        }
-
-        private void DownloadPackages()
-        {
-            if (!Directory.Exists("download"))
-                Directory.CreateDirectory("download");
-
-            foreach (var package in Utility.Packages)
-            {
-                if (_worker.CancellationPending)
-                    return;
-
-                string fileName = string.Format("{0}.{1}.nupkg", package.Id.ToLower(), package.Version);
-                if (File.Exists("download\\" + fileName))
-                {
-                    _worker.ReportProgress(0, string.Format("{0} already downloaded.", fileName));
-                    continue;
-                }
-
-                _worker.ReportProgress(0, string.Format("downloading {0}", fileName));
-                using (var client = new WebClient())
-                {
-                    var dsp = (DataServicePackage)package;
-                    client.DownloadFile(dsp.DownloadUrl, "download\\" + fileName);
-                }
-            }
+            _packageTool.ProcessPackage(textBoxPackage.Text, textBoxVersion.Text, checkBoxPrerelease.Checked);
         }
 
         SlidingBuffer<string> _consoleBuffer = new SlidingBuffer<string>(1000);
@@ -179,12 +91,6 @@ namespace NuGetDependencyDownloader
             textBoxActivity.SelectionLength = 0;
             textBoxActivity.ScrollToCaret();
             textBoxActivity.Refresh();
-        }
-
-        private class Dependency
-        {
-            public string Id { get; set; }
-            public IVersionSpec VersionSpec { get; set; }
         }
     }
 }
