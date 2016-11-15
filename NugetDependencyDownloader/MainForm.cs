@@ -11,13 +11,19 @@ namespace NuGetDependencyDownloader
 {
     public partial class MainForm : Form
     {
-        delegate void SetStopCallback();
-
-        private bool StopRequested { get { return !btnStop.Enabled; } }
+        BackgroundWorker _worker;
 
         public MainForm()
         {
             InitializeComponent();
+        }
+
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (_worker != null && _worker.IsBusy)
+            {
+                _worker.CancelAsync();
+            }
         }
 
         private void btnStart_Click(object sender, EventArgs e)
@@ -25,75 +31,60 @@ namespace NuGetDependencyDownloader
             btnStart.Enabled = false;
             btnStop.Enabled = true;
 
-            LaunchThread();
+            StartWork();
         }
 
         private void btnStop_Click(object sender, EventArgs e)
         {
-            EndWork();
+            btnStop.Enabled = false;
+            _worker.CancelAsync();
         }
-        private void btnStop_EnabledChanged(object sender, EventArgs e)
+
+        private void StartWork()
         {
-            if (btnStop.Enabled == false)
+            _worker = new BackgroundWorker
             {
-                btnStart.Enabled = true;
-            }
+                WorkerSupportsCancellation = true,
+                WorkerReportsProgress = true
+            };
+            _worker.DoWork += new DoWorkEventHandler(DoWork);
+            _worker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(EndWork);
+            _worker.ProgressChanged += new ProgressChangedEventHandler(Progress);
+            _worker.RunWorkerAsync();
         }
 
-        private void LaunchThread()
+        void Progress(object sender, ProgressChangedEventArgs e)
         {
-            BackgroundWorker worker = new BackgroundWorker();
-            worker.DoWork += new DoWorkEventHandler(bgWorker_DoWork);
-            worker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(bgWorker_RunWorkerCompleted);
-            worker.RunWorkerAsync();
+            ShowActivity((string)e.UserState);
         }
 
-        void bgWorker_DoWork(object sender, DoWorkEventArgs e)
+        void EndWork(object sender, RunWorkerCompletedEventArgs e)
         {
-            ProcessPackage();
+            btnStop.Enabled = false;
+            btnStart.Enabled = true;
         }
 
-        void bgWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            EndWork();
-        }
-
-        private void EndWork()
-        {
-            // Shut off stop button in a thread safe way
-            if (btnStop.InvokeRequired)
-            {
-                SetStopCallback d = new SetStopCallback(EndWork);
-                Invoke(d, new object[] { });
-            }
-            else
-            {
-                btnStop.Enabled = false;
-                btnStart.Enabled = true;
-            }
-        }
-
-        private void ProcessPackage()
+        void DoWork(object sender, DoWorkEventArgs e)
         {
             CollectPackages();
 
-            if (StopRequested)
+            if (_worker.CancellationPending)
             {
-                ShowConsole("Stopped.");
+                _worker.ReportProgress(0, "Stopped.");
                 return;
             }
 
-            ShowConsole(string.Format("{0} packages to download.", Utility.Packages.Count));
+            _worker.ReportProgress(0, string.Format("{0} packages to download.", Utility.Packages.Count));
 
             DownloadPackages();
 
-            if (StopRequested)
+            if (_worker.CancellationPending)
             {
-                ShowConsole("Stopped.");
+                _worker.ReportProgress(0, "Stopped.");
                 return;
             }
 
-            ShowConsole("Done.");
+            _worker.ReportProgress(0, "Done.");
         }
 
         private void CollectPackages()
@@ -115,12 +106,12 @@ namespace NuGetDependencyDownloader
 
             if (package == null)
             {
-                ShowConsole("Package not found.");
+                _worker.ReportProgress(0, "Package not found.");
                 return;
             }
 
             Utility.Packages.Add(package);
-            ShowConsole(package.GetFullName());
+            _worker.ReportProgress(0, package.GetFullName());
             LoadDependencies(package);
         }
 
@@ -134,12 +125,12 @@ namespace NuGetDependencyDownloader
 
                 foreach (var dependency in dependencies)
                 {
-                    if (StopRequested)
+                    if (_worker.CancellationPending)
                         return;
 
                     IQueryable<IPackage> packages = Utility.GetPackages(dependency.Id, checkBoxPrerelease.Checked);
                     IPackage depPackage = Utility.GetRangedPackageVersion(packages, dependency.VersionSpec);
-                    ShowConsole(string.Format("{0} -> {1}", package.GetFullName(), depPackage.GetFullName()));
+                    _worker.ReportProgress(0, string.Format("{0} -> {1}", package.GetFullName(), depPackage.GetFullName()));
 
                     if (!Utility.IsPackageKnown(depPackage))
                     {
@@ -157,17 +148,17 @@ namespace NuGetDependencyDownloader
 
             foreach (var package in Utility.Packages)
             {
-                if (StopRequested)
+                if (_worker.CancellationPending)
                     return;
 
                 string fileName = string.Format("{0}.{1}.nupkg", package.Id.ToLower(), package.Version);
                 if (File.Exists("download\\" + fileName))
                 {
-                    ShowConsole(string.Format("{0} already downloaded.", fileName));
+                    _worker.ReportProgress(0, string.Format("{0} already downloaded.", fileName));
                     continue;
                 }
 
-                ShowConsole(string.Format("downloading {0}", fileName));
+                _worker.ReportProgress(0, string.Format("downloading {0}", fileName));
                 using (var client = new WebClient())
                 {
                     var dsp = (DataServicePackage)package;
@@ -178,21 +169,16 @@ namespace NuGetDependencyDownloader
 
         SlidingBuffer<string> _consoleBuffer = new SlidingBuffer<string>(1000);
 
-        private void ShowConsole(string text)
+        private void ShowActivity(string text)
         {
-            Invoke(new MethodInvoker(
-                    delegate
-                    {
-                        _consoleBuffer.Add(text);
+            _consoleBuffer.Add(text);
 
-                        textBoxActivity.Lines = _consoleBuffer.ToArray();
-                        textBoxActivity.Focus();
-                        textBoxActivity.SelectionStart = textBoxActivity.Text.Length;
-                        textBoxActivity.SelectionLength = 0;
-                        textBoxActivity.ScrollToCaret();
-                        textBoxActivity.Refresh();
-                    }
-                ));
+            textBoxActivity.Lines = _consoleBuffer.ToArray();
+            textBoxActivity.Focus();
+            textBoxActivity.SelectionStart = textBoxActivity.Text.Length;
+            textBoxActivity.SelectionLength = 0;
+            textBoxActivity.ScrollToCaret();
+            textBoxActivity.Refresh();
         }
 
         private class Dependency
@@ -200,5 +186,5 @@ namespace NuGetDependencyDownloader
             public string Id { get; set; }
             public IVersionSpec VersionSpec { get; set; }
         }
-   }
+    }
 }

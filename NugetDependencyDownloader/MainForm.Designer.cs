@@ -60,12 +60,11 @@
             this.btnStop.TabIndex = 4;
             this.btnStop.Text = "Stop";
             this.btnStop.UseVisualStyleBackColor = true;
-            this.btnStop.EnabledChanged += new System.EventHandler(this.btnStop_EnabledChanged);
             this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
             // 
             // textBoxPackage
             // 
-            this.textBoxPackage.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
+            this.textBoxPackage.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.textBoxPackage.Location = new System.Drawing.Point(12, 48);
             this.textBoxPackage.Name = "textBoxPackage";
@@ -82,8 +81,8 @@
             // 
             // textBoxActivity
             // 
-            this.textBoxActivity.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
+            this.textBoxActivity.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.textBoxActivity.Location = new System.Drawing.Point(13, 109);
             this.textBoxActivity.Multiline = true;
@@ -149,6 +148,7 @@
             this.MinimumSize = new System.Drawing.Size(600, 500);
             this.Name = "MainForm";
             this.Text = "NuGet Dependency Scraper";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
             this.ResumeLayout(false);
             this.PerformLayout();
 
