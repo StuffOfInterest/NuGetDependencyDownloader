@@ -1,18 +1,16 @@
 ﻿using System;
 using System.ComponentModel;
-using System.Data;
-using System.IO;
 using System.Linq;
-using System.Net;
 using System.Windows.Forms;
-using NuGet;
 
 namespace NuGetDependencyDownloader
 {
     public partial class MainForm : Form
     {
+        SlidingBuffer<string> _consoleBuffer = new SlidingBuffer<string>(1000);
         BackgroundWorker _worker;
         PackageTool _packageTool;
+        private bool _closePending;
 
         public MainForm()
         {
@@ -23,7 +21,11 @@ namespace NuGetDependencyDownloader
         {
             if (_worker != null && _worker.IsBusy)
             {
+                _closePending = true;
                 _worker.CancelAsync();
+                e.Cancel = true;
+                Enabled = false;
+                return;
             }
         }
 
@@ -50,8 +52,8 @@ namespace NuGetDependencyDownloader
                 WorkerReportsProgress = true
             };
             _worker.DoWork += new DoWorkEventHandler(DoWork);
-            _worker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(EndWork);
             _worker.ProgressChanged += new ProgressChangedEventHandler(Progress);
+            _worker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(EndWork);
 
             _packageTool = new PackageTool();
             _packageTool.StopRequested = () => _worker.CancellationPending;
@@ -72,14 +74,15 @@ namespace NuGetDependencyDownloader
 
             _packageTool = null;
             _worker = null;
+
+            if (_closePending) Close();
+            _closePending = false;
         }
 
         void DoWork(object sender, DoWorkEventArgs e)
         {
             _packageTool.ProcessPackage(textBoxPackage.Text, textBoxVersion.Text, checkBoxPrerelease.Checked);
         }
-
-        SlidingBuffer<string> _consoleBuffer = new SlidingBuffer<string>(1000);
 
         private void ShowActivity(string text)
         {
