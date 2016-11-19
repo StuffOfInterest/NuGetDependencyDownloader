@@ -49,7 +49,16 @@ namespace NuGetDependencyDownloader
             }
             else
             {
-                var version = SemanticVersion.Parse(packageVersion);
+                SemanticVersion version;
+                try
+                {
+                    version = SemanticVersion.Parse(packageVersion);
+                }
+                catch (ArgumentException)
+                {
+                    Progress("Unable to parse package version.");
+                    return;
+                }
                 package = GetPackages(packageId, preRelease)
                     .Where(o => o.Version == version)
                     .FirstOrDefault();
@@ -74,7 +83,7 @@ namespace NuGetDependencyDownloader
                     .SelectMany(o => o.Dependencies.Select(x => new Dependency { Id = x.Id, VersionSpec = x.VersionSpec }))
                     .ToList();
 
-                foreach (var dependency in dependencies)
+                foreach (Dependency dependency in dependencies)
                 {
                     if (StopRequested())
                         return;
@@ -97,7 +106,7 @@ namespace NuGetDependencyDownloader
             if (!Directory.Exists("download"))
                 Directory.CreateDirectory("download");
 
-            foreach (var package in _packages)
+            foreach (IPackage package in _packages)
             {
                 if (StopRequested())
                     return;
@@ -112,7 +121,7 @@ namespace NuGetDependencyDownloader
                 Progress(string.Format("downloading {0}", fileName));
                 using (var client = new WebClient())
                 {
-                    var dsp = (DataServicePackage)package;
+                    DataServicePackage dsp = (DataServicePackage)package;
                     client.DownloadFile(dsp.DownloadUrl, "download\\" + fileName);
                 }
             }
@@ -142,7 +151,7 @@ namespace NuGetDependencyDownloader
                     .Where(o => o.IsLatestVersion);
             }
 
-            var latest = packages.OrderByDescending(o => o.Version).FirstOrDefault();
+            IPackage latest = packages.OrderByDescending(o => o.Version).FirstOrDefault();
 
             return latest;
         }
@@ -173,9 +182,11 @@ namespace NuGetDependencyDownloader
                 }
             }
 
-            return packages
+            IPackage package = packages
                 .OrderByDescending(o => o.Version)
                 .FirstOrDefault();
+
+            return package;
         }
 
         private bool IsPackageKnown(IPackage package)

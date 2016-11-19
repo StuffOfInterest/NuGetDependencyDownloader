@@ -7,9 +7,9 @@ namespace NuGetDependencyDownloader
 {
     public partial class MainForm : Form
     {
-        SlidingBuffer<string> _consoleBuffer = new SlidingBuffer<string>(1000);
-        BackgroundWorker _worker;
-        PackageTool _packageTool;
+        private SlidingBuffer<string> _consoleBuffer = new SlidingBuffer<string>(1000);
+        private BackgroundWorker _worker;
+        private PackageTool _packageTool;
         private bool _closePending;
 
         public MainForm()
@@ -62,12 +62,12 @@ namespace NuGetDependencyDownloader
             _worker.RunWorkerAsync();
         }
 
-        void Progress(object sender, ProgressChangedEventArgs e)
+        private void Progress(object sender, ProgressChangedEventArgs e)
         {
             ShowActivity((string)e.UserState);
         }
 
-        void EndWork(object sender, RunWorkerCompletedEventArgs e)
+        private void EndWork(object sender, RunWorkerCompletedEventArgs e)
         {
             btnStop.Enabled = false;
             btnStart.Enabled = true;
@@ -79,7 +79,7 @@ namespace NuGetDependencyDownloader
             _closePending = false;
         }
 
-        void DoWork(object sender, DoWorkEventArgs e)
+        private void DoWork(object sender, DoWorkEventArgs e)
         {
             _packageTool.ProcessPackage(textBoxPackage.Text, textBoxVersion.Text, checkBoxPrerelease.Checked);
         }
