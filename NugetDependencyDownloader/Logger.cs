@@ -1,4 +1,4 @@
-
+using System;
 using System.Threading.Tasks;
 using LINQPad;
 using NuGet.Common;
@@ -7,22 +7,22 @@ namespace NuGetDependencyDownloader
 {
     public class Logger : ILogger
     {
-        public void LogDebug(string data) => $"DEBUG: {data}".Dump();
-        public void LogVerbose(string data) => $"VERBOSE: {data}".Dump();
-        public void LogInformation(string data) => $"INFORMATION: {data}".Dump();
-        public void LogMinimal(string data) => $"MINIMAL: {data}".Dump();
-        public void LogWarning(string data) => $"WARNING: {data}".Dump();
-        public void LogError(string data) => $"ERROR: {data}".Dump();
-        public void LogInformationSummary(string data) => $"DEBUG: {data}".Dump();
+        public void LogDebug(string data) => Console.WriteLine($@"DEBUG: {data}");
+        public void LogVerbose(string data) => Console.WriteLine($@"VERBOSE: {data}");
+        public void LogInformation(string data) => Console.WriteLine($@"INFORMATION: {data}");
+        public void LogMinimal(string data) => Console.WriteLine($@"MINIMAL: {data}");
+        public void LogWarning(string data) => Console.WriteLine($@"WARNING: {data}");
+        public void LogError(string data) => Console.WriteLine($@"ERROR: {data}");
+        public void LogInformationSummary(string data) => Console.WriteLine($@"DEBUG: {data}");
 
-        public void Log(LogLevel level, string data) => $"{level}: {data}".Dump();
+        public void Log(LogLevel level, string data) => Console.WriteLine($@"{level}: {data}");
 
-        public async Task LogAsync(LogLevel level, string data) => $"{level.ToString()}: {data}".Dump();
+        public async Task LogAsync(LogLevel level, string data) => Console.WriteLine($@"{level.ToString()}: {data}");
 
-        public void Log(ILogMessage message) => message.Dump();
+        public void Log(ILogMessage message) =>  Console.WriteLine(message);
 
-        public async Task LogAsync(ILogMessage message)=> $"LOG: {message}".Dump();
+        public async Task LogAsync(ILogMessage message) =>  Console.WriteLine(message);
 
-        public void LogSummary(string data) => $"SUMMARY: {data}".Dump();
+        public void LogSummary(string data) =>  Console.WriteLine($@"SUMMARY: {data}");
     }
 }
