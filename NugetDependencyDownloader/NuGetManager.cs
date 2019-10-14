@@ -103,8 +103,10 @@ namespace NuGetDependencyDownloader
                 )
             };
 
+            var downloadContext = new PackageDownloadContext(SourceCacheContext, PackagesPath, true);
+
             await PackageManager.InstallPackageAsync(PackageManager.PackagesFolderNuGetProject,
-                identity.Id, resolutionContext, projectContext, SourceRepositories,
+                identity, resolutionContext, projectContext, downloadContext, SourceRepositories,
                 Array.Empty<SourceRepository>(), // This is a list of secondary source respositories, probably empty
                 downloadCancelToken);
             if (!downloadCancelToken.IsCancellationRequested)
