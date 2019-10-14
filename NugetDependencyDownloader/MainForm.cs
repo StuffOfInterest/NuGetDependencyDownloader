@@ -1,32 +1,26 @@
 ﻿using System;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
+using LINQPad;
 
 namespace NuGetDependencyDownloader
 {
     public partial class MainForm : Form
     {
-        private SlidingBuffer<string> _consoleBuffer = new SlidingBuffer<string>(1000);
-        private BackgroundWorker _worker;
-        private PackageTool _packageTool;
-        private bool _closePending;
+        Task DownloadNuGet = null;
+        CancellationTokenSource DownloadCancelToken = null;
 
         public MainForm()
         {
             InitializeComponent();
-        }
 
-        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            if (_worker != null && _worker.IsBusy)
-            {
-                _closePending = true;
-                _worker.CancelAsync();
-                e.Cancel = true;
-                Enabled = false;
-                return;
-            }
+            TextBoxWriter writer = new TextBoxWriter(textBoxActivity);
+            Console.SetOut(writer);
         }
 
         private void btnStart_Click(object sender, EventArgs e)
@@ -39,61 +33,51 @@ namespace NuGetDependencyDownloader
 
         private void btnStop_Click(object sender, EventArgs e)
         {
-            ShowActivity("Stop requested.");
+            Console.WriteLine("Stop requested.");
             btnStop.Enabled = false;
-            _worker.CancelAsync();
+            DownloadCancelToken.Cancel();
         }
 
-        private void StartWork()
+        private async void StartWork()
         {
-            _worker = new BackgroundWorker
+            DownloadCancelToken = new CancellationTokenSource();
+            DownloadNuGet = NuGetManager.Downloader(textBoxPackage.Text, textBoxVersion.Text, checkBoxPrerelease.Checked, DownloadCancelToken.Token);
+
+            try {
+                await DownloadNuGet;
+            } catch(InvalidOperationException)
             {
-                WorkerSupportsCancellation = true,
-                WorkerReportsProgress = true
-            };
-            _worker.DoWork += new DoWorkEventHandler(DoWork);
-            _worker.ProgressChanged += new ProgressChangedEventHandler(Progress);
-            _worker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(EndWork);
-
-            _packageTool = new PackageTool();
-            _packageTool.StopRequested = () => _worker.CancellationPending;
-            _packageTool.Progress = (x) => _worker.ReportProgress(0, x);
-
-            _worker.RunWorkerAsync();
-        }
-
-        private void Progress(object sender, ProgressChangedEventArgs e)
-        {
-            ShowActivity((string)e.UserState);
-        }
-
-        private void EndWork(object sender, RunWorkerCompletedEventArgs e)
-        {
-            btnStop.Enabled = false;
+            } catch(OperationCanceledException)
+            {
+            }
             btnStart.Enabled = true;
-
-            _packageTool = null;
-            _worker = null;
-
-            if (_closePending) Close();
-            _closePending = false;
+            btnStop.Enabled = false;
         }
+    }
 
-        private void DoWork(object sender, DoWorkEventArgs e)
+    public class TextBoxWriter : TextWriter
+    {
+        // The control where we will write text.
+        private Control MyControl;
+        public TextBoxWriter(Control control)
         {
-            _packageTool.ProcessPackage(textBoxPackage.Text, textBoxVersion.Text, checkBoxPrerelease.Checked);
+            MyControl = control;
         }
 
-        private void ShowActivity(string text)
+        public override void Write(char value)
         {
-            _consoleBuffer.Add(text);
-
-            textBoxActivity.Lines = _consoleBuffer.ToArray();
-            textBoxActivity.Focus();
-            textBoxActivity.SelectionStart = textBoxActivity.Text.Length;
-            textBoxActivity.SelectionLength = 0;
-            textBoxActivity.ScrollToCaret();
-            textBoxActivity.Refresh();
+            MyControl.Text += value;
         }
+
+        public override void Write(string value)
+        {
+            MyControl.Text += value;
+        }
+
+        public override Encoding Encoding
+        {
+            get => Encoding.Unicode;
+        }
+
     }
 }
