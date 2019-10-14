@@ -1,19 +1,16 @@
 ﻿using System;
-using System.ComponentModel;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using LINQPad;
 
 namespace NuGetDependencyDownloader
 {
     public partial class MainForm : Form
     {
-        Task DownloadNuGet = null;
-        CancellationTokenSource DownloadCancelToken = null;
+        private Task _downloadNuGet = null;
+        private CancellationTokenSource _downloadCancelToken = null;
 
         public MainForm()
         {
@@ -33,18 +30,18 @@ namespace NuGetDependencyDownloader
 
         private void btnStop_Click(object sender, EventArgs e)
         {
-            Console.WriteLine("Stop requested.");
+            Console.WriteLine(@"Stop requested.");
             btnStop.Enabled = false;
-            DownloadCancelToken.Cancel();
+            _downloadCancelToken.Cancel();
         }
 
         private async void StartWork()
         {
-            DownloadCancelToken = new CancellationTokenSource();
-            DownloadNuGet = NuGetManager.Downloader(textBoxPackage.Text, textBoxVersion.Text, checkBoxPrerelease.Checked, DownloadCancelToken.Token);
+            _downloadCancelToken = new CancellationTokenSource();
+            _downloadNuGet = NuGetManager.Downloader(textBoxPackage.Text, textBoxVersion.Text, checkBoxPrerelease.Checked, _downloadCancelToken.Token);
 
             try {
-                await DownloadNuGet;
+                await _downloadNuGet;
             } catch(InvalidOperationException)
             {
             } catch(OperationCanceledException)
